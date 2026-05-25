@@ -24,11 +24,22 @@ from selective_dta_b.eval.posthoc import fit_posthoc_error_regressor, predict_po
 
 CHEMBL_API_BASE = "https://www.ebi.ac.uk/chembl/api/data"
 CHEMBL_STANDARD_TYPES = ("Kd", "Ki", "IC50")
-CHEMBL_SPLIT_RULES = {
-    "train": {"document_year__lte": 2018, "max_rows": 2400},
-    "val": {"document_year__gte": 2019, "document_year__lte": 2021, "max_rows": 900},
-    "test": {"document_year__gte": 2022, "max_rows": 1200},
-}
+
+
+def build_chembl_split_rules(
+    *,
+    train_max_rows: int = 2400,
+    val_max_rows: int = 900,
+    test_max_rows: int = 1200,
+) -> dict[str, dict[str, int]]:
+    return {
+        "train": {"document_year__lte": 2018, "max_rows": int(train_max_rows)},
+        "val": {"document_year__gte": 2019, "document_year__lte": 2021, "max_rows": int(val_max_rows)},
+        "test": {"document_year__gte": 2022, "max_rows": int(test_max_rows)},
+    }
+
+
+CHEMBL_SPLIT_RULES = build_chembl_split_rules()
 AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
 
 
@@ -92,14 +103,24 @@ def _fetch_activity_partition(
     return rows[:max_rows]
 
 
-def fetch_chembl_activity_rows(cache_dir: Path, *, refresh: bool = False) -> pd.DataFrame:
-    cache_path = cache_dir / "chembl_activity_publication_year_raw.csv"
+def fetch_chembl_activity_rows(
+    cache_dir: Path,
+    *,
+    refresh: bool = False,
+    split_rules: dict[str, dict[str, int]] | None = None,
+) -> pd.DataFrame:
+    rules = split_rules or CHEMBL_SPLIT_RULES
+    cache_tag = "_".join(f"{name}{int(rule['max_rows'])}" for name, rule in rules.items())
+    cache_path = cache_dir / f"chembl_activity_publication_year_raw_{cache_tag}.csv"
+    legacy_cache_path = cache_dir / "chembl_activity_publication_year_raw.csv"
+    if rules == CHEMBL_SPLIT_RULES and legacy_cache_path.exists() and not cache_path.exists() and not refresh:
+        return pd.read_csv(legacy_cache_path)
     if cache_path.exists() and not refresh:
         return pd.read_csv(cache_path)
 
     cache_dir.mkdir(parents=True, exist_ok=True)
     all_rows: list[dict[str, object]] = []
-    for split_name, split_filter in CHEMBL_SPLIT_RULES.items():
+    for split_name, split_filter in rules.items():
         per_type = max(1, int(math.ceil(int(split_filter["max_rows"]) / len(CHEMBL_STANDARD_TYPES))))
         for standard_type in CHEMBL_STANDARD_TYPES:
             all_rows.extend(
@@ -266,11 +287,13 @@ def materialize_chembl_publication_year_split(
     *,
     output_dir: str | Path,
     refresh: bool = False,
+    split_rules: dict[str, dict[str, int]] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     root = Path(workspace).resolve()
     out = Path(output_dir).resolve()
     cache_dir = root / "data" / "external_temporal" / "chembl"
-    raw = fetch_chembl_activity_rows(cache_dir, refresh=refresh)
+    rules = split_rules or CHEMBL_SPLIT_RULES
+    raw = fetch_chembl_activity_rows(cache_dir, refresh=refresh, split_rules=rules)
     target_meta = fetch_target_metadata(raw["target_chembl_id"], cache_dir)
     doc_meta = fetch_document_metadata(raw["document_chembl_id"], cache_dir)
     data = raw.merge(target_meta, on="target_chembl_id", how="left").merge(doc_meta, on="document_chembl_id", how="left")
@@ -317,6 +340,7 @@ def materialize_chembl_publication_year_split(
     _write_frame(standardized, out / "chembl_publication_year_temporal_pairs.csv")
     split_counts = standardized["split"].value_counts().to_dict()
     status = {
+        "requested_split_max_rows": {name: int(rule["max_rows"]) for name, rule in rules.items()},
         "raw_activity_rows": int(len(raw)),
         "rows_after_target_sequence_filter": int(len(standardized)),
         "num_targets": int(standardized["target_id"].nunique()) if not standardized.empty else 0,
@@ -590,11 +614,17 @@ def run_chembl_publication_year_backtest(
     refresh: bool = False,
     ensemble_size: int = 3,
     random_state: int = 42,
+    split_rules: dict[str, dict[str, int]] | None = None,
 ) -> dict[str, object]:
     root = Path(workspace).resolve()
     out = Path(output_dir).resolve() if output_dir else root / "reports" / "trans_grade_experiments"
     out.mkdir(parents=True, exist_ok=True)
-    frame, materialize_status = materialize_chembl_publication_year_split(root, output_dir=out, refresh=refresh)
+    frame, materialize_status = materialize_chembl_publication_year_split(
+        root,
+        output_dir=out,
+        refresh=refresh,
+        split_rules=split_rules,
+    )
     frame = add_target_familiarity(frame)
     train = frame.loc[frame["split"] == "train"].copy()
     val = frame.loc[frame["split"] == "val"].copy()
@@ -673,6 +703,7 @@ def run_chembl_publication_year_backtest(
 
 __all__ = [
     "CHEMBL_SPLIT_RULES",
+    "build_chembl_split_rules",
     "fetch_chembl_activity_rows",
     "materialize_chembl_publication_year_split",
     "run_chembl_publication_year_backtest",
