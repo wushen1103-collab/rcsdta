@@ -85,7 +85,7 @@ The paper's main evidence blocks are:
 - independent-calibration excessive-error risk-limit audits;
 - named strong-backbone posthoc transfer;
 - rolling ChEMBL release-temporal backtests;
-- decision-budget virtual screening;
+- decision-budget virtual screening with novel-target subgroup summaries;
 - negative/failure-mode analysis.
 
 ## Data and Large Assets

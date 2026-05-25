@@ -397,6 +397,33 @@ def run_primary_experiments(workspace: Path, output_dir: Path) -> dict[str, obje
             )
         )
     _write_frame(vs_run, output_dir / "primary_vs_run_summary.csv")
+    if vs_target.empty:
+        vs_novel = pd.DataFrame()
+    else:
+        vs_novel = (
+            vs_target.groupby(
+                [
+                    "run_name",
+                    "dataset_name",
+                    "split_name",
+                    "seed",
+                    "model_type",
+                    "decision_budget",
+                    "decision_protocol",
+                    "novel_target_subgroup",
+                ],
+                as_index=False,
+            )
+            .agg(
+                num_targets=("target_id", "nunique"),
+                mean_hit_recovery=("hit_recovery", "mean"),
+                mean_false_positive_risk=("false_positive_risk", "mean"),
+                mean_risk_adjusted_enrichment=("risk_adjusted_enrichment", "mean"),
+                mean_selected_abs_error=("mean_selected_abs_error", "mean"),
+                mean_recommendation_change_rate=("recommendation_change_rate_vs_prediction", "mean"),
+            )
+        )
+    _write_frame(vs_novel, output_dir / "primary_vs_novel_target_summary.csv")
     status = {
         "primary_selector": {
             "name": PRIMARY_SELECTOR_NAME,
@@ -411,6 +438,7 @@ def run_primary_experiments(workspace: Path, output_dir: Path) -> dict[str, obje
         "named_pairwise_rows": int(len(named_pairwise_frame)),
         "risk_detail_rows": int(len(risk_detail)),
         "vs_target_rows": int(len(vs_target)),
+        "vs_novel_target_summary_rows": int(len(vs_novel)),
         "vs_records_with_target_level_candidates": int(vs_target["run_name"].nunique()) if not vs_target.empty else 0,
         "vs_policy": "fixed_lcb_score=prediction_mean-1.0*predicted_abs_error; no test-driven lambda tuning",
     }

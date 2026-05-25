@@ -50,7 +50,7 @@ python scripts/run_chembl_rolling_release_audit.py --workspace . --output-dir re
 - main and named strong-backbone paired comparisons;
 - block-bootstrap summaries;
 - independent-calibration excessive-error risk-limit summaries;
-- fixed-lambda decision-budget screening summaries, including recommendation-change rates.
+- fixed-lambda decision-budget screening summaries, including recommendation-change rates and novel-target subgroup summaries.
 
 `run_chembl_temporal_backtest.py` fetches ChEMBL records with public activity, target, and document metadata; it retains publication year and ChEMBL release fields, and writes the requested train/validation/test caps into `chembl_release_backtest_status.json`. The expanded command above tests train-old/test-new transfer with materially larger acquisition limits than the original default run.
 
