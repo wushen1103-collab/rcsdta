@@ -269,6 +269,9 @@ def _active_set(group: pd.DataFrame) -> set[object]:
 def _vs_rows(record: PredictionRecord, validation: pd.DataFrame, test: pd.DataFrame) -> list[dict[str, object]]:
     del validation
     data = test.copy()
+    required_columns = {"row_id", "target_id", "target", "prediction_mean", "predicted_abs_error_primary", "abs_error"}
+    if not required_columns.issubset(data.columns):
+        return []
     data["score_prediction_only"] = data["prediction_mean"]
     data["score_primary_lcb"] = data["prediction_mean"] - PRIMARY_RISK_LAMBDA * data["predicted_abs_error_primary"]
     if "prediction_std_mc_dropout" in data:
@@ -376,17 +379,23 @@ def run_primary_experiments(workspace: Path, output_dir: Path) -> dict[str, obje
     _write_frame(risk_summary, output_dir / "primary_certified_risk_summary.csv")
     vs_target = pd.DataFrame(vs_rows)
     _write_frame(vs_target, output_dir / "primary_vs_target_rows.csv")
-    vs_run = (
-        vs_target.groupby(["run_name", "dataset_name", "split_name", "seed", "model_type", "decision_budget", "decision_protocol"], as_index=False)
-        .agg(
-            num_targets=("target_id", "nunique"),
-            mean_hit_recovery=("hit_recovery", "mean"),
-            mean_false_positive_risk=("false_positive_risk", "mean"),
-            mean_risk_adjusted_enrichment=("risk_adjusted_enrichment", "mean"),
-            mean_selected_abs_error=("mean_selected_abs_error", "mean"),
-            mean_recommendation_change_rate=("recommendation_change_rate_vs_prediction", "mean"),
+    if vs_target.empty:
+        vs_run = pd.DataFrame()
+    else:
+        vs_run = (
+            vs_target.groupby(
+                ["run_name", "dataset_name", "split_name", "seed", "model_type", "decision_budget", "decision_protocol"],
+                as_index=False,
+            )
+            .agg(
+                num_targets=("target_id", "nunique"),
+                mean_hit_recovery=("hit_recovery", "mean"),
+                mean_false_positive_risk=("false_positive_risk", "mean"),
+                mean_risk_adjusted_enrichment=("risk_adjusted_enrichment", "mean"),
+                mean_selected_abs_error=("mean_selected_abs_error", "mean"),
+                mean_recommendation_change_rate=("recommendation_change_rate_vs_prediction", "mean"),
+            )
         )
-    )
     _write_frame(vs_run, output_dir / "primary_vs_run_summary.csv")
     status = {
         "primary_selector": {
@@ -402,6 +411,7 @@ def run_primary_experiments(workspace: Path, output_dir: Path) -> dict[str, obje
         "named_pairwise_rows": int(len(named_pairwise_frame)),
         "risk_detail_rows": int(len(risk_detail)),
         "vs_target_rows": int(len(vs_target)),
+        "vs_records_with_target_level_candidates": int(vs_target["run_name"].nunique()) if not vs_target.empty else 0,
         "vs_policy": "fixed_lcb_score=prediction_mean-1.0*predicted_abs_error; no test-driven lambda tuning",
     }
     (output_dir / "primary_status.json").write_text(json.dumps(status, indent=2))
