@@ -11,7 +11,6 @@ import pandas as pd
 from scipy.stats import beta, wilcoxon
 
 from selective_dta_b.eval.followup_experiments import (
-    FEATURE_SETS,
     PredictionRecord,
     discover_prediction_records,
     ensure_error_columns,
@@ -47,7 +46,7 @@ def _load(path: Path) -> pd.DataFrame:
 
 
 def _score_primary(validation: pd.DataFrame, test: pd.DataFrame, *, seed: int) -> tuple[pd.DataFrame, pd.DataFrame]:
-    required = [*FEATURE_SETS[PRIMARY_FEATURE_SET], "abs_error"]
+    required = ["prediction_mean", "prediction_std_mc_dropout", "target_familiarity", "target_novelty", "abs_error"]
     missing = [column for column in required if column not in validation or column not in test]
     if missing:
         raise KeyError(f"Missing primary-selector columns: {missing}")

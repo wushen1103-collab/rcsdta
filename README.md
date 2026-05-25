@@ -1,8 +1,8 @@
 # RCSDTA
 
-Reference implementation for the manuscript **Risk-Controlled Selective Drug--Target Affinity Prediction under Distribution Shift**.
+Reference implementation for the manuscript **Selective Reliability for Drug--Target Affinity Prediction under Distribution Shift**.
 
-RCSDTA attaches a posthoc residual-risk selector to fixed drug--target affinity (DTA) predictors. It supports selective retention, risk-control audits, rolling ChEMBL release-temporal evaluation, decision-budget virtual screening, and failure-mode analysis.
+RCSDTA attaches a posthoc residual-risk selector to fixed drug--target affinity (DTA) predictors. It supports selective retention, independent-calibration risk-limit audits, ChEMBL temporal evaluation, decision-budget virtual screening, and failure-mode analysis.
 
 ## Release Scope
 
@@ -41,23 +41,39 @@ python scripts/check_env.py
 python scripts/detect_resources.py
 ```
 
-Run the main selective reliability workflow:
+Run the locked primary-selector workflow used for the submission evidence chain:
+
+```bash
+python scripts/run_primary_submission_experiments.py --workspace . --output-dir reports/primary_submission_experiments
+```
+
+The primary selector is fixed before test evaluation as `Ridge(alpha=1.0)` on the `enriched9` residual-risk feature set. The decision-budget protocol uses a fixed risk-adjusted candidate score,
+`prediction_mean - 1.0 * predicted_abs_error`, and records how often its recommendations differ from prediction-only ranking.
+
+Run the expanded ChEMBL publication-year temporal backtest:
+
+```bash
+python scripts/run_chembl_temporal_backtest.py \
+  --workspace . \
+  --output-dir reports/primary_submission_experiments/chembl_expanded \
+  --refresh \
+  --train-max-rows 9000 \
+  --val-max-rows 4500 \
+  --test-max-rows 6000
+python scripts/run_chembl_rolling_release_audit.py \
+  --workspace . \
+  --output-dir reports/primary_submission_experiments/chembl_expanded_rolling
+```
+
+The publication-year command obtains public ChEMBL records through the API and records its requested sampling caps in the output status file. Sampling-scale-specific caches prevent an expanded run from being silently confused with the smaller default protocol. The rolling ChEMBL audit uses the materialized `chembl_release` metadata to diagnose release-to-release temporal transfer.
+
+Additional legacy and sensitivity workflows remain available:
 
 ```bash
 python scripts/run_trans_grade_experiments.py
-python scripts/build_paper_selective_summary.py
-```
-
-Run maximal reliability and temporal analyses:
-
-```bash
 python scripts/run_maximal_trans_experiments.py
-python scripts/run_chembl_temporal_backtest.py
-python scripts/run_chembl_rolling_release_audit.py --workspace .
 python scripts/run_submission_upgrade_audits.py --workspace .
 ```
-
-The rolling ChEMBL audit produces the train-old/calibrate/test-new evaluation windows used to diagnose temporal transfer. The submission-upgrade audit computes named strong-backbone comparisons, block-bootstrap robustness, leave-one-group-out analyses, and independent-calibration excessive-error risk-limit summaries.
 
 ## Backbones and Evaluation
 
@@ -66,7 +82,7 @@ The provided code covers the posthoc selector pipeline and experiment adapters u
 The paper's main evidence blocks are:
 
 - paired selective reliability and retained-set error;
-- formal and independent-calibration risk-control audits;
+- independent-calibration excessive-error risk-limit audits;
 - named strong-backbone posthoc transfer;
 - rolling ChEMBL release-temporal backtests;
 - decision-budget virtual screening;
@@ -74,13 +90,12 @@ The paper's main evidence blocks are:
 
 ## Data and Large Assets
 
-Benchmark data are not redistributed in this repository. Prepare Davis, KIBA, BindingDB, and ChEMBL-derived data according to their respective licenses and the loaders/configurations in this package. Large pretrained molecular/protein assets and output predictions are also excluded.
+Benchmark data are not redistributed in this repository. Prepare Davis, KIBA, and BindingDB data according to their respective licenses and the loaders/configurations in this package. The ChEMBL publication-year protocol can materialize its public data directly through `run_chembl_temporal_backtest.py`; the generated records and caches remain excluded. Large pretrained molecular/protein assets and output predictions are also excluded.
 
 ## Claim Boundary
 
-RCSDTA is a retrospective reliability and risk-aware triage framework. This release does not claim prospective wet-lab validation, universal temporal AURC gains, or a distribution-free guarantee under arbitrary data shifts.
+RCSDTA is a retrospective reliability and risk-aware triage framework. This release does not claim prospective wet-lab validation, universal temporal AURC gains, or a distribution-free guarantee under arbitrary data shifts. Risk-limit results have their finite-sample interpretation only under the documented independent-calibration assumptions.
 
 ## License
 
 See [LICENSE](LICENSE).
-
