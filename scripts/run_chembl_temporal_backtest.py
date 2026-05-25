@@ -18,6 +18,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--train-max-rows", type=int, default=2400)
     parser.add_argument("--val-max-rows", type=int, default=900)
     parser.add_argument("--test-max-rows", type=int, default=1200)
+    parser.add_argument("--sqlite", default=None, help="Path to an official ChEMBL SQLite release; bypasses the public API")
+    parser.add_argument("--chembl-release", default="local_sqlite", help="Release label stored with SQLite-materialized pairs")
     return parser
 
 
@@ -34,6 +36,8 @@ def main() -> int:
             val_max_rows=args.val_max_rows,
             test_max_rows=args.test_max_rows,
         ),
+        sqlite_path=args.sqlite,
+        chembl_release=args.chembl_release,
     )
     print(json.dumps(status, indent=2))
     return 0

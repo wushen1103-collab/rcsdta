@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import sqlite3
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -357,6 +358,139 @@ def materialize_chembl_publication_year_split(
     return standardized, status
 
 
+def materialize_chembl_sqlite_publication_year_split(
+    workspace: str | Path,
+    *,
+    sqlite_path: str | Path,
+    output_dir: str | Path,
+    split_rules: dict[str, dict[str, int]] | None = None,
+    chembl_release: str = "local_sqlite",
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    """Materialize a temporal DTA split from an official ChEMBL SQLite release."""
+    root = Path(workspace).resolve()
+    out = Path(output_dir).resolve()
+    database = Path(sqlite_path).resolve()
+    if not database.exists():
+        raise FileNotFoundError(f"ChEMBL SQLite file does not exist: {database}")
+    rules = split_rules or CHEMBL_SPLIT_RULES
+    base_query = """
+        WITH target_seq AS (
+            SELECT
+                tc.tid,
+                seq.accession,
+                seq.sequence,
+                ROW_NUMBER() OVER (
+                    PARTITION BY tc.tid ORDER BY LENGTH(seq.sequence) DESC, seq.accession
+                ) AS rn
+            FROM target_components AS tc
+            JOIN component_sequences AS seq ON seq.component_id = tc.component_id
+            WHERE seq.sequence IS NOT NULL
+        )
+        SELECT
+            act.activity_id,
+            assay.chembl_id AS assay_chembl_id,
+            doc.chembl_id AS document_chembl_id,
+            doc.year AS document_year,
+            mol.chembl_id AS molecule_chembl_id,
+            struct.canonical_smiles,
+            act.pchembl_value,
+            act.standard_type,
+            act.standard_units,
+            act.standard_value,
+            target.chembl_id AS target_chembl_id,
+            target.pref_name AS target_pref_name,
+            target_seq.accession AS target_accession,
+            target_seq.sequence AS target_sequence
+        FROM activities AS act
+        JOIN assays AS assay ON assay.assay_id = act.assay_id
+        JOIN docs AS doc ON doc.doc_id = assay.doc_id
+        JOIN molecule_dictionary AS mol ON mol.molregno = act.molregno
+        JOIN compound_structures AS struct ON struct.molregno = act.molregno
+        JOIN target_dictionary AS target ON target.tid = assay.tid
+        JOIN target_seq ON target_seq.tid = target.tid AND target_seq.rn = 1
+        WHERE act.pchembl_value IS NOT NULL
+          AND struct.canonical_smiles IS NOT NULL
+          AND target.organism = 'Homo sapiens'
+          AND target.target_type = 'SINGLE PROTEIN'
+          AND act.standard_type IN ('Kd', 'Ki', 'IC50')
+          AND COALESCE(act.standard_relation, '=') = '='
+          AND doc.year IS NOT NULL
+    """
+    split_frames: list[pd.DataFrame] = []
+    with sqlite3.connect(database) as connection:
+        for split_name, rule in rules.items():
+            clauses: list[str] = []
+            parameters: list[object] = []
+            if "document_year__lte" in rule:
+                clauses.append("doc.year <= ?")
+                parameters.append(int(rule["document_year__lte"]))
+            if "document_year__gte" in rule:
+                clauses.append("doc.year >= ?")
+                parameters.append(int(rule["document_year__gte"]))
+            query = base_query + (" AND " + " AND ".join(clauses) if clauses else "") + " ORDER BY act.activity_id LIMIT ?"
+            parameters.append(int(rule["max_rows"]))
+            split = pd.read_sql_query(query, connection, params=parameters)
+            split["split"] = split_name
+            split_frames.append(split)
+    data = pd.concat(split_frames, ignore_index=True) if split_frames else pd.DataFrame()
+    if data.empty:
+        raise RuntimeError("No ChEMBL SQLite rows matched the temporal split query.")
+    data["chembl_release"] = chembl_release
+    data["chembl_release_creation_date"] = pd.NA
+    data["row_id"] = data["activity_id"].map(lambda value: f"chembl_activity_{int(value)}")
+    data["dataset_name"] = "chembl"
+    data["drug_id"] = data["molecule_chembl_id"]
+    data["drug_smiles"] = data["canonical_smiles"]
+    data["target_id"] = data["target_chembl_id"]
+    data["affinity_model_target"] = pd.to_numeric(data["pchembl_value"], errors="coerce")
+    data["target"] = data["affinity_model_target"]
+    data["temporal_axis"] = "document_year"
+    data = data.dropna(subset=["target_sequence", "drug_smiles", "affinity_model_target", "document_year"])
+    data = data.sort_values(["document_year", "activity_id"]).drop_duplicates(
+        ["drug_smiles", "target_id", "standard_type", "document_year"], keep="first"
+    )
+    keep = [
+        "row_id",
+        "dataset_name",
+        "drug_id",
+        "drug_smiles",
+        "target_id",
+        "target_sequence",
+        "target_accession",
+        "target_pref_name",
+        "assay_chembl_id",
+        "document_chembl_id",
+        "document_year",
+        "chembl_release",
+        "chembl_release_creation_date",
+        "standard_type",
+        "standard_units",
+        "standard_value",
+        "affinity_model_target",
+        "target",
+        "split",
+        "temporal_axis",
+    ]
+    standardized = data[[column for column in keep if column in data.columns]].reset_index(drop=True)
+    processed_dir = root / "data" / "processed" / "chembl"
+    _write_frame(standardized, processed_dir / "standardized_pairs.csv")
+    _write_frame(standardized, processed_dir / "splits" / "publication_year_temporal_seed42.csv")
+    _write_frame(standardized, out / "chembl_publication_year_temporal_pairs.csv")
+    split_counts = standardized["split"].value_counts().to_dict()
+    status = {
+        "data_source": "official_chembl_sqlite",
+        "sqlite_path": str(database),
+        "chembl_release": chembl_release,
+        "requested_split_max_rows": {name: int(rule["max_rows"]) for name, rule in rules.items()},
+        "rows_after_target_sequence_filter": int(len(standardized)),
+        "split_counts": {name: int(split_counts.get(name, 0)) for name in rules},
+        "min_document_year": int(standardized["document_year"].min()) if not standardized.empty else None,
+        "max_document_year": int(standardized["document_year"].max()) if not standardized.empty else None,
+        "temporal_axis": "document_year",
+    }
+    return standardized, status
+
+
 def _stable_hash(text: object, modulo: int) -> int:
     digest = hashlib.md5(str(text).encode("utf-8", errors="ignore")).hexdigest()
     return int(digest[:12], 16) % modulo
@@ -615,16 +749,27 @@ def run_chembl_publication_year_backtest(
     ensemble_size: int = 3,
     random_state: int = 42,
     split_rules: dict[str, dict[str, int]] | None = None,
+    sqlite_path: str | Path | None = None,
+    chembl_release: str = "local_sqlite",
 ) -> dict[str, object]:
     root = Path(workspace).resolve()
     out = Path(output_dir).resolve() if output_dir else root / "reports" / "trans_grade_experiments"
     out.mkdir(parents=True, exist_ok=True)
-    frame, materialize_status = materialize_chembl_publication_year_split(
-        root,
-        output_dir=out,
-        refresh=refresh,
-        split_rules=split_rules,
-    )
+    if sqlite_path:
+        frame, materialize_status = materialize_chembl_sqlite_publication_year_split(
+            root,
+            sqlite_path=sqlite_path,
+            output_dir=out,
+            split_rules=split_rules,
+            chembl_release=chembl_release,
+        )
+    else:
+        frame, materialize_status = materialize_chembl_publication_year_split(
+            root,
+            output_dir=out,
+            refresh=refresh,
+            split_rules=split_rules,
+        )
     frame = add_target_familiarity(frame)
     train = frame.loc[frame["split"] == "train"].copy()
     val = frame.loc[frame["split"] == "val"].copy()
@@ -706,5 +851,6 @@ __all__ = [
     "build_chembl_split_rules",
     "fetch_chembl_activity_rows",
     "materialize_chembl_publication_year_split",
+    "materialize_chembl_sqlite_publication_year_split",
     "run_chembl_publication_year_backtest",
 ]

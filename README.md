@@ -67,6 +67,21 @@ python scripts/run_chembl_rolling_release_audit.py \
 
 The publication-year command obtains public ChEMBL records through the API and records its requested sampling caps in the output status file. Sampling-scale-specific caches prevent an expanded run from being silently confused with the smaller default protocol. The rolling ChEMBL audit uses the materialized `chembl_release` metadata to diagnose release-to-release temporal transfer.
 
+If the public API is unavailable, download an official SQLite release and run the same expanded publication-year protocol locally:
+
+```bash
+python scripts/run_chembl_temporal_backtest.py \
+  --workspace . \
+  --output-dir reports/primary_submission_experiments/chembl36_expanded \
+  --sqlite data/external_temporal/chembl_36/chembl_36_sqlite/chembl_36.db \
+  --chembl-release chembl_36 \
+  --train-max-rows 9000 \
+  --val-max-rows 4500 \
+  --test-max-rows 6000
+```
+
+The SQLite route filters human single-protein `Kd`, `Ki`, and `IC50` measurements with `pChEMBL` values, joins protein sequences from the official release, and builds the same train-old/test-new publication-year split without redistributing the database.
+
 Additional legacy and sensitivity workflows remain available:
 
 ```bash

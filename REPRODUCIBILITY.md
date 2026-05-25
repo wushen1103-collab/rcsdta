@@ -40,6 +40,8 @@ pip install -e .
 python scripts/check_env.py
 python scripts/run_primary_submission_experiments.py --workspace . --output-dir reports/primary_submission_experiments
 python scripts/run_chembl_temporal_backtest.py --workspace . --output-dir reports/primary_submission_experiments/chembl_expanded --refresh --train-max-rows 9000 --val-max-rows 4500 --test-max-rows 6000
+# Offline fallback when the public API is unavailable:
+python scripts/run_chembl_temporal_backtest.py --workspace . --output-dir reports/primary_submission_experiments/chembl36_expanded --sqlite data/external_temporal/chembl_36/chembl_36_sqlite/chembl_36.db --chembl-release chembl_36 --train-max-rows 9000 --val-max-rows 4500 --test-max-rows 6000
 python scripts/run_chembl_rolling_release_audit.py --workspace . --output-dir reports/primary_submission_experiments/chembl_expanded_rolling
 ```
 
@@ -52,7 +54,7 @@ python scripts/run_chembl_rolling_release_audit.py --workspace . --output-dir re
 - independent-calibration excessive-error risk-limit summaries;
 - fixed-lambda decision-budget screening summaries, including recommendation-change rates and novel-target subgroup summaries.
 
-`run_chembl_temporal_backtest.py` fetches ChEMBL records with public activity, target, and document metadata; it retains publication year and ChEMBL release fields, and writes the requested train/validation/test caps into `chembl_release_backtest_status.json`. The expanded command above tests train-old/test-new transfer with materially larger acquisition limits than the original default run.
+`run_chembl_temporal_backtest.py` either fetches ChEMBL records with public activity, target, and document metadata or reads an official ChEMBL SQLite release through `--sqlite`. Both paths retain publication year and ChEMBL release fields and write the requested train/validation/test caps into `chembl_release_backtest_status.json`. The SQLite fallback filters human single-protein `Kd`, `Ki`, and `IC50` records with `pChEMBL` values and does not redistribute the underlying public database. The expanded commands above test train-old/test-new transfer with materially larger acquisition limits than the original default run.
 
 `run_chembl_rolling_release_audit.py` generates:
 
