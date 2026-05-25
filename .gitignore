@@ -1,0 +1,33 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# Data, model artifacts, and generated experiment outputs
+/data/
+/artifacts/
+/checkpoints/
+/logs/
+/reports/
+/results*/
+/outputs/
+/cache/
+*.pt
+*.pth
+*.ckpt
+*.pkl
+*.parquet
+*.npy
+*.npz
+
+# Manuscript assets and generated media are not part of this code release
+paper/
+figures/
+tables/
+*.pdf
+*.png
+*.svg
+*.tif
+*.csv
+*.tsv

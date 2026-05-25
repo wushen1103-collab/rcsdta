@@ -1,0 +1,9 @@
+{
+  "dataset_name": "bindingdb",
+  "split_type": "random",
+  "random_seed": 42,
+  "group_key": "target_id",
+  "novelty_metric": "none",
+  "output_filename": "bindingdb_random_seed42.json",
+  "default_output_path": "configs/splits/bindingdb_random_seed42.json"
+}

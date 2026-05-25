@@ -1,0 +1,9 @@
+{
+  "dataset_name": "davis",
+  "split_type": "unseen_target",
+  "random_seed": 42,
+  "group_key": "target_id",
+  "novelty_metric": "target_holdout",
+  "output_filename": "davis_unseen_target_seed42.json",
+  "default_output_path": "configs/splits/davis_unseen_target_seed42.json"
+}
