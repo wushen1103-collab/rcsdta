@@ -10,7 +10,9 @@ The code supports the experiment protocols reported in the manuscript:
 4. rolling ChEMBL release-temporal backtesting;
 5. decision-budget virtual screening;
 6. failure-mode decomposition;
-7. block-bootstrap, leave-one-group-out, and independent-calibration audits.
+7. validation-year drift-aware ChEMBL36 and conservative event-risk audits;
+8. target-level decision-trace extraction;
+9. block-bootstrap, leave-one-group-out, and independent-calibration audits.
 
 The repository does not include generated figures, embedded manuscript tables, large prediction files, trained checkpoints, or full result snapshots.
 
@@ -43,6 +45,7 @@ python scripts/run_chembl_temporal_backtest.py --workspace . --output-dir report
 # Offline fallback when the public API is unavailable:
 python scripts/run_chembl_temporal_backtest.py --workspace . --output-dir reports/primary_submission_experiments/chembl36_expanded --sqlite data/external_temporal/chembl_36/chembl_36_sqlite/chembl_36.db --chembl-release chembl_36 --train-max-rows 9000 --val-max-rows 4500 --test-max-rows 6000
 python scripts/run_chembl_rolling_release_audit.py --workspace . --output-dir reports/primary_submission_experiments/chembl_expanded_rolling
+python scripts/run_kbs_pr_additional_audits.py --chembl-pairs reports/primary_submission_experiments/chembl36_expanded/chembl_publication_year_temporal_pairs.csv --vs-target-rows reports/primary_submission_experiments/primary_vs_target_rows.csv --output-dir reports/primary_submission_experiments/kbs_pr_additions
 ```
 
 ## Audit Outputs
@@ -62,6 +65,12 @@ python scripts/run_chembl_rolling_release_audit.py --workspace . --output-dir re
 - confidence-source summary metrics;
 - paired selector-versus-comparator summaries;
 - optional pair-level prediction outputs.
+
+`run_kbs_pr_additional_audits.py` generates:
+
+- a validation-year drift-aware ChEMBL36 repair sensitivity;
+- a conservative Clopper--Pearson event-risk audit over explicit absolute-error events;
+- automatically selected target-level decision traces for the fixed decision-budget protocol.
 
 These generated files are excluded from this repository to keep the public release compact. They are generated artefacts, not input data required to inspect the protocol.
 

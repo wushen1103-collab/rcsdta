@@ -82,6 +82,17 @@ python scripts/run_chembl_temporal_backtest.py \
 
 The SQLite route filters human single-protein `Kd`, `Ki`, and `IC50` measurements with `pChEMBL` values, joins protein sequences from the official release, and builds the same train-old/test-new publication-year split without redistributing the database.
 
+Run the KBS/PR-oriented add-on audits from a materialized ChEMBL36 pair file and target-level decision-budget rows:
+
+```bash
+python scripts/run_kbs_pr_additional_audits.py \
+  --chembl-pairs reports/primary_submission_experiments/chembl36_expanded/chembl_publication_year_temporal_pairs.csv \
+  --vs-target-rows reports/primary_submission_experiments/primary_vs_target_rows.csv \
+  --output-dir reports/primary_submission_experiments/kbs_pr_additions
+```
+
+This script reports a validation-year drift-aware ChEMBL36 sensitivity, a conservative Clopper--Pearson event-risk audit, and target-level virtual-screening decision traces. It does not use 2022 ChEMBL36 test labels for tuning.
+
 Additional legacy and sensitivity workflows remain available:
 
 ```bash
@@ -100,7 +111,9 @@ The paper's main evidence blocks are:
 - independent-calibration excessive-error risk-limit audits;
 - named strong-backbone posthoc transfer;
 - rolling ChEMBL release-temporal backtests;
+- validation-year drift-aware and conservative event-risk ChEMBL36 audits;
 - decision-budget virtual screening with novel-target subgroup summaries;
+- target-level virtual-screening decision traces;
 - negative/failure-mode analysis.
 
 ## Data and Large Assets
