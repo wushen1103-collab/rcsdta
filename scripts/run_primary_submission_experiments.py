@@ -21,7 +21,7 @@ from selective_dta_b.eval.posthoc import fit_posthoc_error_regressor, predict_po
 
 PRIMARY_REGRESSOR = "ridge"
 PRIMARY_FEATURE_SET = "enriched9"
-PRIMARY_SELECTOR_NAME = "ridge_enriched9_v1"
+PRIMARY_SELECTOR_NAME = "ridge_enriched9"
 PRIMARY_RISK_LAMBDA = 1.0
 PRIMARY_MODELS = ("adambind", "deepdtagen", "kanpm", "pmmr")
 BASELINE_SOURCES = ("mc_dropout", "target_familiarity")
@@ -134,7 +134,7 @@ def _pairwise_rows(summary: pd.DataFrame, *, scope: str) -> pd.DataFrame:
 
 def _block_bootstrap(summary: pd.DataFrame, *, reps: int = 4000) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
-    rng = np.random.default_rng(20260525)
+    rng = np.random.default_rng(42)
     for metric in SELECTIVE_METRICS:
         pivot = summary.pivot_table(
             index=["run_name", "dataset_name", "split_name", "model_type"],
@@ -224,7 +224,7 @@ def _risk_limit_rows(records: list[PredictionRecord]) -> pd.DataFrame:
         test = _load(record.test_path)
         if len(validation) < 8:
             continue
-        order = np.random.default_rng(20260525 + int(record.seed)).permutation(len(validation))
+        order = np.random.default_rng(42 + int(record.seed)).permutation(len(validation))
         midpoint = max(2, len(order) // 2)
         fit = validation.iloc[order[:midpoint]].copy()
         calibration = validation.iloc[order[midpoint:]].copy()

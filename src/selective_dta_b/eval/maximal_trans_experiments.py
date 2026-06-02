@@ -524,7 +524,7 @@ def _paired_rows(
     metrics: dict[str, str],
     bootstrap_reps: int = 2000,
 ) -> list[dict[str, object]]:
-    rng = np.random.default_rng(20260521)
+    rng = np.random.default_rng(42)
     rows: list[dict[str, object]] = []
     for metric_name, direction in metrics.items():
         if metric_name not in frame:

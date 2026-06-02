@@ -11,7 +11,7 @@ import pandas as pd
 def collect_run_summaries(workspace: Path) -> pd.DataFrame:
     roots = [
         workspace / "artifacts" / "external_runs" / "adambind_formal" / "runs",
-        workspace / "artifacts" / "external_runs" / "adambind_viable11_refcsv_v2" / "runs",
+        workspace / "artifacts" / "external_runs" / "adambind_viable11_refcsv" / "runs",
     ]
     rows: list[dict[str, object]] = []
     for root in roots:

@@ -568,7 +568,7 @@ def run_formal_risk_control(
     out = Path(output_dir).resolve()
     records = discover_prediction_records(root, paper_only=paper_only, max_runs=max_runs)
     rows: list[dict[str, object]] = []
-    rng = np.random.default_rng(20260520)
+    rng = np.random.default_rng(42)
 
     for record in records:
         validation = _read_prediction_frame(record.validation_path)

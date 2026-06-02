@@ -55,7 +55,7 @@ def main() -> int:
     args = build_parser().parse_args()
     workspace = Path(args.workspace).resolve()
     python = str(workspace / ".venv" / "bin" / "python")
-    log_path = workspace / "logs" / "temporal_followup_posthoc_20260421.log"
+    log_path = workspace / "logs" / "temporal_followup_posthoc.log"
 
     for _ in range(args.max_wait_rounds):
         if not _training_active():

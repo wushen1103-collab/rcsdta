@@ -121,7 +121,7 @@ def _bootstrap_block_ci(deltas: pd.DataFrame, *, reps: int = 4000) -> tuple[floa
     blocks = deltas["block_delta"].to_numpy(dtype=float)
     if not len(blocks):
         return float("nan"), float("nan")
-    rng = np.random.default_rng(20260525)
+    rng = np.random.default_rng(42)
     samples = rng.choice(blocks, size=(reps, len(blocks)), replace=True).mean(axis=1)
     return float(np.percentile(samples, 2.5)), float(np.percentile(samples, 97.5))
 

@@ -121,7 +121,7 @@ def _load_adambind_rows(workspace: Path) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     roots = [
         workspace / "artifacts" / "external_runs" / "adambind_formal" / "runs",
-        workspace / "artifacts" / "external_runs" / "adambind_viable11_refcsv_v2" / "runs",
+        workspace / "artifacts" / "external_runs" / "adambind_viable11_refcsv" / "runs",
     ]
     for root in roots:
         if not root.exists():
